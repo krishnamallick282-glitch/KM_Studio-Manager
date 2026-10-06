@@ -1,0 +1,38 @@
+package com.kmstudio.manager;
+
+import android.app.*;
+import android.os.*;
+import android.content.*;
+import android.graphics.Color;
+import android.net.Uri;
+import android.view.*;
+import android.widget.*;
+import org.json.*;
+import java.util.*;
+
+public class MainActivity extends Activity {
+    LinearLayout root, content; TextView title;
+    ArrayList<Booking> bookings=new ArrayList<>(); ArrayList<Payment> payments=new ArrayList<>(); ArrayList<Expense> expenses=new ArrayList<>();
+    android.content.SharedPreferences sp;
+    public void onCreate(Bundle b){super.onCreate(b); sp=getSharedPreferences("km",0); load(); build(); showDashboard();}
+    TextView tv(String s,int size){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(Color.DKGRAY);t.setPadding(16,14,16,14);return t;}
+    Button btn(String s){Button b=new Button(this);b.setText(s);return b;}
+    void build(){root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(0xfff5f6f8);
+        title=tv("📸 KM Studio Manager",22);title.setTextColor(Color.WHITE);title.setBackgroundColor(Color.BLACK);root.addView(title);
+        LinearLayout nav=new LinearLayout(this);nav.setOrientation(LinearLayout.HORIZONTAL);
+        String[] ns={"Dashboard","Bookings","Payments","Expenses","WhatsApp"};
+        for(String n:ns){Button x=btn(n);nav.addView(x,new LinearLayout.LayoutParams(0,60,1));if(n.equals("Dashboard"))x.setOnClickListener(v->showDashboard());if(n.equals("Bookings"))x.setOnClickListener(v->showBookings());if(n.equals("Payments"))x.setOnClickListener(v->showPayments());if(n.equals("Expenses"))x.setOnClickListener(v->showExpenses());if(n.equals("WhatsApp"))x.setOnClickListener(v->showWhatsApp());}
+        root.addView(nav); ScrollView sv=new ScrollView(this);content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(12,12,12,80);sv.addView(content);root.addView(sv,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);}
+    void clear(String h){content.removeAllViews();content.addView(tv(h,24));}
+    EditText field(String hint){EditText e=new EditText(this);e.setHint(hint);content.addView(e);return e;}
+    void save(){try{JSONArray bs=new JSONArray();for(Booking b:bookings){JSONObject o=new JSONObject();o.put("name",b.name);o.put("phone",b.phone);o.put("event",b.event);o.put("date",b.date);o.put("loc",b.loc);o.put("price",b.price);o.put("advance",b.advance);bs.put(o);}JSONArray ps=new JSONArray();for(Payment x:payments){JSONObject o=new JSONObject();o.put("client",x.client);o.put("amount",x.amount);o.put("date",x.date);ps.put(o);}JSONArray es=new JSONArray();for(Expense x:expenses){JSONObject o=new JSONObject();o.put("title",x.title);o.put("amount",x.amount);o.put("date",x.date);es.put(o);}sp.edit().putString("bookings",bs.toString()).putString("payments",ps.toString()).putString("expenses",es.toString()).apply();}catch(Exception e){}}
+void load(){try{JSONArray a=new JSONArray(sp.getString("bookings","[]"));for(int i=0;i<a.length();i++){JSONObject o=a.getJSONObject(i);bookings.add(new Booking(o.optString("name"),o.optString("phone"),o.optString("event"),o.optString("date"),o.optString("loc"),o.optDouble("price"),o.optDouble("advance")));}a=new JSONArray(sp.getString("payments","[]"));for(int i=0;i<a.length();i++){JSONObject o=a.getJSONObject(i);payments.add(new Payment(o.optString("client"),o.optDouble("amount"),o.optString("date")));}a=new JSONArray(sp.getString("expenses","[]"));for(int i=0;i<a.length();i++){JSONObject o=a.getJSONObject(i);expenses.add(new Expense(o.optString("title"),o.optDouble("amount"),o.optString("date")));}}catch(Exception e){}}
+void showDashboard(){clear("Dashboard");double val=0,rec=0,ex=0;for(Booking b:bookings){val+=b.price;rec+=b.advance;}for(Expense e:expenses)ex+=e.amount;content.addView(tv("Total Booking: ₹"+val+"\nReceived: ₹"+rec+"\nPending: ₹"+Math.max(0,val-rec)+"\nExpenses: ₹"+ex+"\nEstimated Profit: ₹"+(rec-ex),19));content.addView(tv("Upcoming bookings",20));for(Booking b:bookings)content.addView(tv(b.date+" — "+b.name+" — "+b.event+" — Due ₹"+(b.price-b.advance),16));}
+    void showBookings(){clear("Add / Manage Booking");EditText n=field("Client name"),p=field("WhatsApp number (91XXXXXXXXXX)"),ev=field("Event type"),d=field("Event date YYYY-MM-DD"),loc=field("Location"),pr=field("Package price"),ad=field("Advance received");Button add=btn("➕ Save Booking");content.addView(add);add.setOnClickListener(v->{try{bookings.add(new Booking(n.getText().toString(),p.getText().toString(),ev.getText().toString(),d.getText().toString(),loc.getText().toString(),Double.parseDouble(pr.getText().toString()),Double.parseDouble(ad.getText().toString())));Toast.makeText(this,"Booking saved",0).show();save();showBookings();}catch(Exception e){Toast.makeText(this,"Enter valid price/advance",0).show();}});for(int i=0;i<bookings.size();i++){final int k=i;Booking b=bookings.get(i);LinearLayout row=new LinearLayout(this);row.setOrientation(LinearLayout.VERTICAL);row.setPadding(8,12,8,12);row.addView(tv(b.name+" | "+b.event+"\n"+b.date+" | ₹"+b.price+" | Due ₹"+(b.price-b.advance),16));Button del=btn("🗑 Delete");row.addView(del);del.setOnClickListener(v->{bookings.remove(k);save();showBookings();});content.addView(row);}}
+    void showPayments(){clear("Payments");EditText n=field("Client"),a=field("Amount"),d=field("Date");Button add=btn("➕ Add Payment");content.addView(add);add.setOnClickListener(v->{try{payments.add(new Payment(n.getText().toString(),Double.parseDouble(a.getText().toString()),d.getText().toString()));showPayments();}catch(Exception e){}});for(int i=0;i<payments.size();i++){final int k=i;Payment p=payments.get(i);content.addView(tv(p.client+" — ₹"+p.amount+" — "+p.date,16));Button x=btn("Delete");content.addView(x);x.setOnClickListener(v->{payments.remove(k);save();showPayments();});}}
+    void showExpenses(){clear("Expenses");EditText n=field("Expense"),a=field("Amount"),d=field("Date");Button add=btn("➕ Save Expense");content.addView(add);add.setOnClickListener(v->{try{expenses.add(new Expense(n.getText().toString(),Double.parseDouble(a.getText().toString()),d.getText().toString()));showExpenses();}catch(Exception e){}});for(int i=0;i<expenses.size();i++){final int k=i;Expense x=expenses.get(i);content.addView(tv(x.title+" — ₹"+x.amount+" — "+x.date,16));Button del=btn("Delete");content.addView(del);del.setOnClickListener(v->{expenses.remove(k);save();showExpenses();});}}
+    void showWhatsApp(){clear("WhatsApp");EditText num=field("Number 91XXXXXXXXXX"),msg=field("Message");msg.setText("Hello, thank you for booking with KM Studio. Your event details and payment information are confirmed.");Button send=btn("📲 Open WhatsApp");content.addView(send);send.setOnClickListener(v->{String u="https://wa.me/"+num.getText().toString().replaceAll("\\D","")+"?text="+Uri.encode(msg.getText().toString());startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(u)));});}
+    static class Booking{String name,phone,event,date,loc;double price,advance;Booking(String n,String p,String e,String d,String l,double pr,double a){name=n;phone=p;event=e;date=d;loc=l;price=pr;advance=a;}}
+    static class Payment{String client,date;double amount;Payment(String c,double a,String d){client=c;amount=a;date=d;}}
+    static class Expense{String title,date;double amount;Expense(String t,double a,String d){title=t;amount=a;date=d;}}
+}
